@@ -1,0 +1,41 @@
+name: Update Performance Data
+
+on:
+  schedule:
+    # Run every 4 minutes
+    - cron: '*/4 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Generate performance data
+        run: npm run generate-data
+        
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+      - name: Commit and push if changed
+        run: |
+          git add public/data/performance-data.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update performance data [skip ci]" && git push)

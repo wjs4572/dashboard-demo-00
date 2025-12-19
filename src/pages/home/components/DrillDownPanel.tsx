@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 
 interface DrillDownPanelProps {
   metricId: string;
@@ -5,6 +6,21 @@ interface DrillDownPanelProps {
 }
 
 export default function DrillDownPanel({ metricId, onClose }: DrillDownPanelProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    // Trigger slide-in animation after mount
+    setIsVisible(true);
+  }, []);
+
+  const handleClose = () => {
+    // Trigger slide-out animation before closing
+    setIsVisible(false);
+    setTimeout(() => {
+      onClose();
+    }, 1000); // Match animation duration
+  };
+
   const metricDetails: Record<string, any> = {
     'response-time': {
       title: 'Response Time Breakdown',
@@ -70,65 +86,71 @@ export default function DrillDownPanel({ metricId, onClose }: DrillDownPanelProp
 
   const details = metricDetails[metricId];
 
+  if (!details) {
+    return null;
+  }
+
   return (
-    <section className="mb-8">
-      <div className="bg-white rounded-xl border-2 border-[#2563EB] shadow-lg p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-[#1E293B] mb-1">{details.title}</h2>
-            <p className="text-sm text-gray-600">{details.description}</p>
+    <div 
+      className={`bg-white dark:bg-gray-800 rounded-xl border-2 border-[#2563EB] dark:border-blue-500 shadow-lg p-6 transition-opacity duration-1000 ease-in-out ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h2 className="text-lg font-semibold text-[#1E293B] dark:text-white mb-1">{details.title}</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300">{details.description}</p>
+        </div>
+        <button 
+          onClick={handleClose}
+          className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+        >
+          <i className="ri-close-line text-xl text-gray-600 dark:text-gray-300"></i>
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Component Breakdown</h3>
+          <div className="space-y-3">
+            {details.components.map((component: any, index: number) => (
+                <div key={index} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-300 dark:border-gray-600">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-[#1E293B] dark:text-white">{component.name}</span>
+                  <span className="text-sm font-semibold text-[#1E293B] dark:text-white">{component.value}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all ${
+                        component.status === 'critical' ? 'bg-[#CC2936] dark:bg-red-500' :
+                        component.status === 'warning' ? 'bg-yellow-500' :
+                        'bg-[#085665] dark:bg-teal-500'
+                      }`}
+                      style={{ width: `${component.percentage}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-right">{component.percentage}%</span>
+                </div>
+              </div>
+            ))}
           </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <i className="ri-close-line text-xl text-gray-600"></i>
-          </button>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <h3 className="text-base font-medium text-[#1E293B] mb-4">Component Breakdown</h3>
-            <div className="space-y-3">
-              {details.components.map((component: any, index: number) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-[#1E293B]">{component.name}</span>
-                    <span className="text-sm font-semibold text-[#1E293B]">{component.value}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
-                      <div 
-                        className={`h-full rounded-full transition-all ${
-                          component.status === 'critical' ? 'bg-[#CC2936]' :
-                          component.status === 'warning' ? 'bg-yellow-500' :
-                          'bg-[#085665]'
-                        }`}
-                        style={{ width: `${component.percentage}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs text-gray-500 w-12 text-right">{component.percentage}%</span>
-                  </div>
+        <div>
+          <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Key Insights</h3>
+          <div className="space-y-3">
+            {details.insights.map((insight: string, index: number) => (
+              <div key={index} className="flex gap-3 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                  <i className="ri-lightbulb-line text-base text-[#2563EB] dark:text-blue-400"></i>
                 </div>
-              ))}
-            </div>
-          </div>
-          
-          <div>
-            <h3 className="text-base font-medium text-[#1E293B] mb-4">Key Insights</h3>
-            <div className="space-y-3">
-              {details.insights.map((insight: string, index: number) => (
-                <div key={index} className="flex gap-3 p-3 bg-blue-50 rounded-lg">
-                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                    <i className="ri-lightbulb-line text-base text-[#2563EB]"></i>
-                  </div>
-                  <p className="text-sm text-gray-700">{insight}</p>
-                </div>
-              ))}
-            </div>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -1,15 +1,46 @@
 import { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { getTrendsData, type DataPoint } from '@/data/dataService';
 
 export default function TrendsBaseline() {
   const [selectedTimeRange, setSelectedTimeRange] = useState('1h');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [responseTimeData, setResponseTimeData] = useState<DataPoint[]>([]);
+  const [errorRateData, setErrorRateData] = useState<DataPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [chartsVisible, setChartsVisible] = useState(false);
 
+  // Fetch data when time range changes or on interval
   useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setChartsVisible(false); // Fade out before loading new data
+      try {
+        const [responseData, errorData] = await Promise.all([
+          getTrendsData(selectedTimeRange, 'responseTime'),
+          getTrendsData(selectedTimeRange, 'errorRate')
+        ]);
+        setResponseTimeData(responseData);
+        setErrorRateData(errorData);
+        // Small delay to ensure data is set before fade-in
+        setTimeout(() => setChartsVisible(true), 50);
+      } catch (error) {
+        console.error('Error fetching trends data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+    
+    // Refetch every minute to get updated data
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 60000); // Update every minute
+      fetchData();
+    }, 60000);
+    
     return () => clearInterval(timer);
-  }, []);
+  }, [selectedTimeRange]);
 
   const timeRanges = [
     { id: '1h', label: '1H' },
@@ -19,122 +50,102 @@ export default function TrendsBaseline() {
     { id: '30d', label: '30D' }
   ];
 
-  // Generate clock time labels aligned to 10-minute boundaries
-  const generateTimeLabels = () => {
-    const now = new Date(currentTime);
-    const currentMinutes = now.getMinutes();
-    const currentHours = now.getHours();
+  // Format timestamp for X-axis based on time range
+  const formatXAxis = (timestamp: number) => {
+    const date = new Date(timestamp);
     
-    // Round down to nearest 10-minute boundary
-    const alignedMinutes = Math.floor(currentMinutes / 10) * 10;
-    const endTime = new Date(now);
-    endTime.setMinutes(alignedMinutes, 0, 0);
-    
-    const labels = [];
-    // Generate 7 labels (every 10 minutes for 1 hour)
-    for (let i = 6; i >= 0; i--) {
-      const time = new Date(endTime.getTime() - i * 10 * 60000);
-      const hours = time.getHours();
-      const minutes = time.getMinutes();
-      const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      labels.push(formattedTime);
+    switch (selectedTimeRange) {
+      case '1h':
+      case '6h':
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      case '24h':
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      case '7d':
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      case '30d':
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      default:
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
     }
-    return labels;
   };
 
-  // Generate response time data points
-  const generateResponseTimeData = () => {
-    const now = new Date(currentTime);
-    const alignedMinutes = Math.floor(now.getMinutes() / 10) * 10;
-    const endTime = new Date(now);
-    endTime.setMinutes(alignedMinutes, 0, 0);
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const date = new Date(label);
+      return (
+        <div className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg p-3 shadow-lg">
+          <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+            {date.toLocaleString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })}
+          </p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {entry.value.toFixed(entry.name.includes('%') ? 2 : 0)}{entry.name.includes('ms') ? 'ms' : '%'}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  // Split data into segments - only lines leading TO violations are red
+  const createSegments = (data: any[], baseline: number) => {
+    const redSegments: any[] = [];
     
-    const data = [];
-    const baseline = 270;
-    const targetAverage = baseline * (1 - 0.083); // 8.3% below baseline = 247.39ms
-    
-    // Generate 13 points (every 5 minutes for 1 hour)
-    for (let i = 12; i >= 0; i--) {
-      const time = new Date(endTime.getTime() - i * 5 * 60000);
-      const hours = time.getHours();
-      const minutes = time.getMinutes();
-      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    for (let i = 0; i < data.length - 1; i++) {
+      const current = data[i];
+      const next = data[i + 1];
       
-      let value;
-      // Check if this is the 11:32 time slot (or close to it)
-      if (timeString === '11:30' || timeString === '11:35') {
-        // Point above baseline at 11:32 area
-        value = 285;
-      } else {
-        // Random values between 0-250, biased toward target average
-        const random = Math.random();
-        if (random < 0.3) {
-          value = Math.floor(Math.random() * 100) + 150; // 150-250
-        } else if (random < 0.7) {
-          value = Math.floor(Math.random() * 80) + 200; // 200-280 (around target)
-        } else {
-          value = Math.floor(Math.random() * 150) + 50; // 50-200
-        }
+      // Line from current to next is red ONLY if next point is above baseline
+      if (next.value > baseline) {
+        // Create a mini-dataset with just these two points for this segment
+        redSegments.push({
+          data: data.map((point, idx) => {
+            if (idx === i || idx === i + 1) {
+              return point;
+            }
+            return { ...point, value: null };
+          })
+        });
       }
-      
-      data.push({
-        time: i, // index from 0 to 12
-        value: value,
-        timeString: timeString
-      });
     }
     
-    return data;
+    return redSegments;
   };
 
-  const responseTimeData = generateResponseTimeData();
-  const errorRateData: { time: number; value: number }[] = [];
-
-  const responseTimeBaseline = 270;
-  const errorRateBaseline = 2.0;
-
-  // Calculate Y position for a value
-  const getYPosition = (value: number, min: number, max: number) => {
-    const normalized = (value - min) / (max - min);
-    return (1 - normalized) * 100;
-  };
-
-  // Calculate X position for a time index (0-12)
-  const getXPosition = (timeIndex: number) => {
-    return (timeIndex / 12) * 100;
-  };
-
-  // Generate SVG path for the line
-  const generatePath = (data: typeof responseTimeData) => {
-    if (data.length === 0) return '';
-    
-    const points = data.map(d => {
-      const x = getXPosition(d.time);
-      const y = getYPosition(d.value, 0, 500);
-      return `${x},${y}`;
-    });
-    
-    return `M ${points.join(' L ')}`;
-  };
+  const responseTimeRedSegments = createSegments(responseTimeData, 270);
+  const errorRateRedSegments = createSegments(errorRateData, 2.0);
 
   return (
     <section className="mb-8">
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold text-[#1E293B] mb-1">Trends and Baseline Comparison</h2>
-            <p className="text-sm text-gray-600">Rolling 1-hour window showing recent performance patterns</p>
+            <h2 className="text-lg font-semibold text-[#1E293B] dark:text-white mb-1">Trends and Baseline Comparison</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              {selectedTimeRange === '1h' && 'Rolling 1-hour window showing recent performance patterns'}
+              {selectedTimeRange === '6h' && 'Last 6 hours of performance data'}
+              {selectedTimeRange === '24h' && 'Last 24 hours of performance trends'}
+              {selectedTimeRange === '7d' && 'Last 7 days of performance trends'}
+              {selectedTimeRange === '30d' && 'Last 30 days of performance trends'}
+            </p>
           </div>
           
-          <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
             {timeRanges.map((range) => (
               <button
                 key={range.id}
                 onClick={() => setSelectedTimeRange(range.id)}
                 className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all whitespace-nowrap cursor-pointer ${
                   selectedTimeRange === range.id
-                    ? 'bg-white text-[#1E293B] shadow-sm'
-                    : 'text-gray-600 hover:text-[#1E293B]'
+                    ? 'bg-white dark:bg-gray-600 text-[#1E293B] dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-[#1E293B] dark:hover:text-white'
                 }`}
               >
                 {range.label}
@@ -143,31 +154,111 @@ export default function TrendsBaseline() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-500 ease-in ${chartsVisible ? 'opacity-100' : 'opacity-0'}`}>
           {/* Response Time Trend */}
-          <div className="bg-gray-50 rounded-lg p-5">
-            <h3 className="text-base font-medium text-[#1E293B] mb-4">Response Time (ms)</h3>
-            <div className="relative">
-              <img 
-                src="https://static.readdy.ai/image/9e99d7141ea7221ac1fbc067090ea47d/54ef5dc6e63e64eb4377b061d12504f0.png" 
-                alt="Response Time Trend Chart"
-                className="w-full h-auto rounded border border-gray-200"
-                style={{ minHeight: '280px' }}
-              />
-            </div>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
+            <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Response Time (ms)</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={responseTimeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="timestamp"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatXAxis}
+                  stroke="#6B7280"
+                  style={{ fontSize: '12px' }}
+                  scale="time"
+                />
+                <YAxis 
+                  stroke="#6B7280"
+                  style={{ fontSize: '12px' }}
+                  domain={[200, 300]}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine 
+                  y={270} 
+                  stroke="#10B981" 
+                  strokeDasharray="5 5" 
+                  label={{ value: 'Baseline: 270ms', position: 'insideTopRight', fill: '#10B981', fontSize: 12 }}
+                />
+                <Line
+                  type="linear"
+                  dataKey="value"
+                  stroke="#2563EB"
+                  strokeWidth={2}
+                  dot={{ fill: '#2563EB', r: 3 }}
+                  name="Response Time (ms)"
+                  isAnimationActive={false}
+                />
+                {responseTimeRedSegments.map((segment, idx) => (
+                  <Line
+                    key={`red-segment-${idx}`}
+                    type="linear"
+                    dataKey="value"
+                    data={segment.data}
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    dot={{ fill: '#EF4444', r: 3 }}
+                    isAnimationActive={false}
+                    connectNulls={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
           
           {/* Error Rate Trend */}
-          <div className="bg-gray-50 rounded-lg p-5">
-            <h3 className="text-base font-medium text-[#1E293B] mb-4">Error Rate (%)</h3>
-            <div className="relative">
-              <img 
-                src="https://static.readdy.ai/image/9e99d7141ea7221ac1fbc067090ea47d/2bdeb44e1896038b48783ff37145519d.png" 
-                alt="Error Rate Trend Chart"
-                className="w-full h-auto rounded border border-gray-200"
-                style={{ minHeight: '280px' }}
-              />
-            </div>
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
+            <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Error Rate (%)</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={errorRateData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis 
+                  dataKey="timestamp"
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatXAxis}
+                  stroke="#6B7280"
+                  style={{ fontSize: '12px' }}
+                  scale="time"
+                />
+                <YAxis 
+                  stroke="#6B7280"
+                  style={{ fontSize: '12px' }}
+                  domain={[1.5, 2.8]}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <ReferenceLine 
+                  y={2.0} 
+                  stroke="#10B981" 
+                  strokeDasharray="5 5" 
+                  label={{ value: 'Baseline: 2.0%', position: 'insideTopRight', fill: '#10B981', fontSize: 12 }}
+                />
+                <Line
+                  type="linear"
+                  dataKey="value"
+                  stroke="#2563EB"
+                  strokeWidth={2}
+                  dot={{ fill: '#2563EB', r: 3 }}
+                  name="Error Rate (%)"
+                  isAnimationActive={false}
+                />
+                {errorRateRedSegments.map((segment, idx) => (
+                  <Line
+                    key={`red-segment-${idx}`}
+                    type="linear"
+                    dataKey="value"
+                    data={segment.data}
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    dot={{ fill: '#EF4444', r: 3 }}
+                    isAnimationActive={false}
+                    connectNulls={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
