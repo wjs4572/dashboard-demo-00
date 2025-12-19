@@ -1,7 +1,8 @@
 // Client-side data generator for production deployment
 // Generates data dynamically in the browser without needing a backend
+// Note: This file is not currently used - PHP backend is used instead
 
-import { getChartConfig } from './dataConfig';
+import { defaultConfig } from './dataConfig';
 
 const randomBetween = (min: number, max: number): number => {
   return Math.random() * (max - min) + min;
@@ -47,7 +48,7 @@ const generateTimeSeriesData = (
   intervalMinutes: number,
   metricType: 'responseTime' | 'errorRate'
 ): DataPoint[] => {
-  const config = getChartConfig();
+  const config = defaultConfig;
   const now = Date.now();
   const data: DataPoint[] = [];
   const numPoints = Math.floor(windowMinutes / intervalMinutes);
@@ -101,7 +102,7 @@ const generateSummaryMetric = (
 
 // Generate complete performance data
 export const generatePerformanceData = (): PerformanceData => {
-  const config = getChartConfig();
+  const config = defaultConfig;
   
   // Generate time series for all windows
   const responseTime: TimeSeriesData = {

@@ -2,3 +2,6 @@ node_modules
 *.zip
 auto-imports.d.ts
 package-lock.json
+
+# PHP cache files (auto-generated)
+public/data/performance-cache.json

@@ -19,8 +19,10 @@ export default function AlertsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  const alerts: Alert[] = [
+  const [viewModalAlert, setViewModalAlert] = useState<Alert | null>(null);
+  const [editModalAlert, setEditModalAlert] = useState<Alert | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<Alert>>({});
+  const [alerts, setAlerts] = useState<Alert[]>([
     {
       id: 1,
       severity: 'warning',
@@ -154,7 +156,7 @@ export default function AlertsPage() {
       status: 'resolved',
       assignee: 'Drew Garcia'
     }
-  ];
+  ]);
 
   const filteredAlerts = alerts.filter(alert => {
     const matchesSearch = alert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,6 +198,70 @@ export default function AlertsPage() {
     }
   };
 
+  const exportToCSV = () => {
+    // Define CSV headers
+    const headers = ['ID', 'Severity', 'Title', 'Description', 'Time', 'Affected', 'Count', 'Status', 'Assignee'];
+    
+    // Convert filtered alerts to CSV rows
+    const rows = filteredAlerts.map(alert => [
+      alert.id,
+      alert.severity,
+      alert.title,
+      alert.description,
+      alert.time,
+      alert.affected,
+      alert.count,
+      alert.status,
+      alert.assignee || 'Unassigned'
+    ]);
+    
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `alerts-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleViewAlert = (alert: Alert) => {
+    setViewModalAlert(alert);
+  };
+
+  const handleEditAlert = (alert: Alert) => {
+    setEditModalAlert(alert);
+    setEditFormData({
+      status: alert.status,
+      assignee: alert.assignee
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (!editModalAlert) return;
+    
+    // Update the alerts array with the new values
+    setAlerts(prevAlerts => 
+      prevAlerts.map(alert => 
+        alert.id === editModalAlert.id 
+          ? { ...alert, ...editFormData }
+          : alert
+      )
+    );
+    
+    // In a real app, this would also save to backend
+    console.log('Saving changes:', { id: editModalAlert.id, ...editFormData });
+    setEditModalAlert(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 font-['Inter',sans-serif] transition-colors">
       {/* Header */}
@@ -214,7 +280,10 @@ export default function AlertsPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">{filteredAlerts.length} alerts found</p>
               </div>
             </div>
-            <button className="px-4 py-2 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap cursor-pointer">
+            <button 
+              onClick={exportToCSV}
+              className="px-4 py-2 bg-[#2563EB] text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap cursor-pointer"
+            >
               Export Report
             </button>
           </div>
@@ -351,18 +420,35 @@ export default function AlertsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {alert.metric && (
+                        {alert.metric ? (
                           <button 
                             onClick={() => handleInvestigate(alert.metric)}
-                            className="px-3 py-1.5 text-xs font-medium text-[#2563EB] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors whitespace-nowrap cursor-pointer"
+                            className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer group relative"
+                            title="Investigate"
                           >
-                            Investigate
+                            <i className="ri-search-line text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
+                          </button>
+                        ) : (
+                          <button 
+                            className="w-8 h-8 flex items-center justify-center rounded-lg cursor-not-allowed"
+                            title="Unassigned Investigation"
+                            disabled
+                          >
+                            <i className="ri-search-line text-gray-300 dark:text-gray-600"></i>
                           </button>
                         )}
-                        <button className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer group">
+                        <button 
+                          onClick={() => handleViewAlert(alert)}
+                          className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer group"
+                          title="View Details"
+                        >
                           <i className="ri-eye-line text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
                         </button>
-                        <button className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer group">
+                        <button 
+                          onClick={() => handleEditAlert(alert)}
+                          className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer group"
+                          title="Edit Alert"
+                        >
                           <i className="ri-edit-line text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400"></i>
                         </button>
                       </div>
@@ -384,6 +470,134 @@ export default function AlertsPage() {
           )}
         </div>
       </main>
+
+      {/* View Alert Modal */}
+      {viewModalAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Alert Details</h2>
+              <button 
+                onClick={() => setViewModalAlert(null)}
+                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <i className="ri-close-line text-xl text-gray-600 dark:text-gray-400"></i>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Severity</label>
+                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getSeverityColor(viewModalAlert.severity)}`}>
+                  {viewModalAlert.severity.toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Title</label>
+                <p className="text-gray-900 dark:text-white">{viewModalAlert.title}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Description</label>
+                <p className="text-gray-700 dark:text-gray-300">{viewModalAlert.description}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Affected System</label>
+                <p className="text-gray-700 dark:text-gray-300">{viewModalAlert.affected}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Occurrence Count</label>
+                  <p className="text-gray-900 dark:text-white font-semibold">{viewModalAlert.count}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Time</label>
+                  <p className="text-gray-700 dark:text-gray-300">{viewModalAlert.time}</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Status</label>
+                <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(viewModalAlert.status)}`}>
+                  {viewModalAlert.status.charAt(0).toUpperCase() + viewModalAlert.status.slice(1)}
+                </span>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Assignee</label>
+                <p className="text-gray-700 dark:text-gray-300">{viewModalAlert.assignee || 'Unassigned'}</p>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end">
+              <button 
+                onClick={() => setViewModalAlert(null)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Alert Modal */}
+      {editModalAlert && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Alert</h2>
+              <button 
+                onClick={() => setEditModalAlert(null)}
+                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <i className="ri-close-line text-xl text-gray-600 dark:text-gray-400"></i>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Title</label>
+                <p className="text-gray-900 dark:text-white font-semibold">{editModalAlert.title}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Description</label>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{editModalAlert.description}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Status</label>
+                <select
+                  value={editFormData.status}
+                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as Alert['status'] })}
+                  className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none cursor-pointer bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                >
+                  <option value="active">Active</option>
+                  <option value="investigating">Investigating</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Assignee</label>
+                <input
+                  type="text"
+                  value={editFormData.assignee || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, assignee: e.target.value })}
+                  placeholder="Enter assignee name"
+                  className="w-full px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
+                />
+              </div>
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-end gap-3">
+              <button 
+                onClick={() => setEditModalAlert(null)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSaveEdit}
+                className="px-4 py-2 bg-[#2563EB] text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

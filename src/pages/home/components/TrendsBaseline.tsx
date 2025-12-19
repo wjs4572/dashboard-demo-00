@@ -159,7 +159,7 @@ export default function TrendsBaseline() {
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
             <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Response Time (ms)</h3>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={responseTimeData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <LineChart data={responseTimeData} margin={{ top: 10, right: 10, left: 0, bottom: selectedTimeRange === '30d' ? 60 : 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
                   dataKey="timestamp"
@@ -169,6 +169,9 @@ export default function TrendsBaseline() {
                   stroke="#6B7280"
                   style={{ fontSize: '12px' }}
                   scale="time"
+                  angle={selectedTimeRange === '30d' ? -90 : 0}
+                  textAnchor={selectedTimeRange === '30d' ? 'end' : 'middle'}
+                  height={selectedTimeRange === '30d' ? 80 : 30}
                 />
                 <YAxis 
                   stroke="#6B7280"
@@ -212,7 +215,7 @@ export default function TrendsBaseline() {
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
             <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Error Rate (%)</h3>
             <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={errorRateData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <LineChart data={errorRateData} margin={{ top: 10, right: 10, left: 0, bottom: selectedTimeRange === '30d' ? 60 : 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
                   dataKey="timestamp"
@@ -222,6 +225,9 @@ export default function TrendsBaseline() {
                   stroke="#6B7280"
                   style={{ fontSize: '12px' }}
                   scale="time"
+                  angle={selectedTimeRange === '30d' ? -90 : 0}
+                  textAnchor={selectedTimeRange === '30d' ? 'end' : 'middle'}
+                  height={selectedTimeRange === '30d' ? 80 : 30}
                 />
                 <YAxis 
                   stroke="#6B7280"
