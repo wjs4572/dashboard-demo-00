@@ -156,9 +156,9 @@ export default function TrendsBaseline() {
         
         <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 transition-opacity duration-500 ease-in ${chartsVisible ? 'opacity-100' : 'opacity-0'}`}>
           {/* Response Time Trend */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600" style={{ height: '380px' }}>
             <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Response Time (ms)</h3>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={selectedTimeRange === '30d' ? 400 : 280}>
               <LineChart data={responseTimeData} margin={{ top: 10, right: 10, left: 0, bottom: selectedTimeRange === '30d' ? 60 : 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
@@ -212,9 +212,9 @@ export default function TrendsBaseline() {
           </div>
           
           {/* Error Rate Trend */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600">
+          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-5 border border-gray-300 dark:border-gray-600" style={{ height: '380px' }}>
             <h3 className="text-base font-medium text-[#1E293B] dark:text-white mb-4">Error Rate (%)</h3>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={selectedTimeRange === '30d' ? 400 : 280}>
               <LineChart data={errorRateData} margin={{ top: 10, right: 10, left: 0, bottom: selectedTimeRange === '30d' ? 60 : 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis 
